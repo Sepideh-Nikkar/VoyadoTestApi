@@ -3,6 +3,7 @@ using RestSharp;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using VoyadoWebAppTest.Models;
+using System.Configuration;
 
 namespace VoyadoApi.Controllers
 {
@@ -14,14 +15,13 @@ namespace VoyadoApi.Controllers
         readonly string mainGithubUrl = "https://api.github.com/search/code?q=";
 
         [HttpGet(Name = "GetSearchHits")]
-        public string GetSearchHits(string keyword)
+        public string GetSearchHits(string keyword, string githubApiToken)
         {
             var validKeyword = Validate(keyword);
             var keywords = validKeyword.Split(' ');
 
             var isWikiResponseOk = false;
             var isGithubResponseOk = false;
-            var isResponseOk = false;
 
             var searchHitsOnWiki = 0;
             var searchHitOnGithub = 0;
@@ -29,28 +29,23 @@ namespace VoyadoApi.Controllers
             for (int i = 0; i < keywords.Length; i++)
             {
                 var endpointWiki = mainWikiUrl + "{" + keywords[i] + "}&utf8=&format=json";
-                var responseWiki = GetSearchResponse(endpointWiki, false, out isWikiResponseOk);
+                var responseWiki = GetSearchResponse(endpointWiki, out isWikiResponseOk);
                 var temp = GetSearchHits(responseWiki, SeachEngineType.Wikipedia);
-                if (temp >= 0)
+                if (isWikiResponseOk && temp > 0)
                 {
                     searchHitsOnWiki += temp;
                 };
 
                 var endPointGitHub = mainGithubUrl + keywords[i] + "+repo:jquery/jquery";
-                var responseGithub = GetSearchResponse(endPointGitHub, true, out isGithubResponseOk);
+                var responseGithub = GetSearchResponse(endPointGitHub, out isGithubResponseOk, githubApiToken);
                 temp = GetSearchHits(responseGithub, SeachEngineType.Github);
-                if (temp >= 0)
+                if (isGithubResponseOk && temp > 0)
                 {
                     searchHitOnGithub += temp;
                 }
             }
 
-            if (isWikiResponseOk && isGithubResponseOk)
-            {
-                isResponseOk = true;
-            }
-
-            var returnObj = new ApiResponseModel(searchHitsOnWiki, searchHitOnGithub, isResponseOk);
+            var returnObj = new ApiResponseModel(searchHitsOnWiki, searchHitOnGithub, isWikiResponseOk, isGithubResponseOk);
             var result = JsonSerializer.Serialize(returnObj);
             return result;
         }
@@ -62,29 +57,22 @@ namespace VoyadoApi.Controllers
             return keyword;
         }
 
-        private static string GetSearchResponse(string url, bool authorization, out bool isResponseOk)
+        private static string GetSearchResponse(string url, out bool isResponseOk, string githubToken = "")
         {
             var returnVal = "";
-            isResponseOk = true;
+            isResponseOk = false;
             var client = new RestClient("https://api.github.com/search/code?q=ask+repo:jquery/jquery");
             var request = new RestRequest(url, Method.Get);
-            if (authorization == true)
+            if (githubToken != String.Empty)
             {
-                request.AddHeader("Authorization", "Bearer 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");
+                request.AddHeader("Authorization", "Bearer " + githubToken);
             }
 
-            try
+            var response = client.Execute(request);
+            if (response.IsSuccessStatusCode)
             {
-                var response = client.Execute(request);
-                returnVal = response != null ? response.Content : "";
-                if (!response.IsSuccessStatusCode)
-                {
-                    isResponseOk = false;
-                }
-            }
-            catch
-            {
-                isResponseOk = false;
+                isResponseOk = true;
+                returnVal = response.Content;
             }
 
             return returnVal;
@@ -94,7 +82,7 @@ namespace VoyadoApi.Controllers
         {
             int returnVal = -1;
 
-            if (response == null) return returnVal;
+            if (response == String.Empty) return returnVal;
 
             switch (engineType)
             {
