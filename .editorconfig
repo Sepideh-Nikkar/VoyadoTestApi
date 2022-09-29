@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+  <system.webServer>
+    <urlCompression doDynamicCompression="true" doStaticCompression="true"/>
+    <httpCompression>
+      <staticTypes>
+        <add mimeType="image/svg+xml" enabled="true"/>
+      </staticTypes>
+    </httpCompression>
+  </system.webServer>
+</configuration>
